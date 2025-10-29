@@ -40,8 +40,7 @@ const apps: AppItem[] = [
     description:
       'Explora y vende productos de PetroArte.',
     icon: <FaStore className="text-4xl text-[#DC143C]" />,
-    // 🔗 cuando tengas tu tienda online cámbialo aquí:
-    url: 'https://petroshop-six.vercel.app/',
+    url: 'https://petroshop-six.vercel.app',
   },
 ]
 
