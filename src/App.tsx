@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { FaCalculator, FaStore, FaUsersCog } from 'react-icons/fa'
+import { FaCalculator, FaDatabase, FaStore, FaUsersCog } from 'react-icons/fa'
+
+type UserRole = 'admin' | 'user' | 'demo'
 
 type StoredUser = {
   id: string
@@ -9,6 +11,7 @@ type StoredUser = {
   name: string
   createdAt: string
   lastLoginAt?: string
+  role: UserRole
 }
 
 type AppItem = {
@@ -17,6 +20,7 @@ type AppItem = {
   description: string
   icon: ReactNode
   url: string
+  requiredRole?: UserRole
 }
 
 type Particle = {
@@ -35,6 +39,32 @@ type FeedbackState = {
 
 const USERS_KEY = 'petro.users'
 const SESSION_KEY = 'petro.session'
+const DEMO_EMAIL = 'demo@petroart.com'
+const DEMO_PASSWORD = 'petro1234'
+const ADMIN_EMAILS = new Set<string>(['admin@petroart.com'])
+const ADMIN_PASSWORD = 'admin1234'
+
+
+type PersistedUser = Omit<StoredUser, 'role'> & { role?: UserRole }
+
+const normalizeStoredUser = (user: PersistedUser): StoredUser => {
+  const email = user.email.toLowerCase()
+  let role: UserRole
+  if (user.role) {
+    role = user.role
+  } else if (email === DEMO_EMAIL) {
+    role = 'demo'
+  } else if (ADMIN_EMAILS.has(email)) {
+    role = 'admin'
+  } else {
+    role = 'user'
+  }
+
+  return {
+    ...user,
+    role,
+  }
+}
 
 function useParticles(count: number) {
   const [particles, setParticles] = useState<Particle[]>([])
@@ -76,6 +106,14 @@ const APP_ITEMS: AppItem[] = [
     icon: <FaStore className="text-4xl text-[#DC143C]" />,
     url: 'https://petroshop-six.vercel.app',
   },
+  {
+    id: 'mongo-admin',
+    name: 'Mongo BD',
+    description: 'Gestiona la base de datos de PetroArte (solo administradores).',
+    icon: <FaDatabase className="text-4xl text-[#DC143C]" />,
+    url: 'https://cloud.mongodb.com/',
+    requiredRole: 'admin',
+  },
 ]
 
 const safeNow = () => new Date().toISOString()
@@ -96,9 +134,9 @@ export default function App() {
     try {
       const raw = window.localStorage.getItem(USERS_KEY)
       if (!raw) return []
-      const parsed = JSON.parse(raw) as StoredUser[]
+      const parsed = JSON.parse(raw) as PersistedUser[]
       if (!Array.isArray(parsed)) return []
-      return parsed
+      return parsed.map((user) => normalizeStoredUser(user))
     } catch (error) {
       console.warn('No se pudieron leer usuarios:', error)
       return []
@@ -136,10 +174,8 @@ export default function App() {
 
     let loaded = readUsers()
 
-    const demoEmail = 'demo@petroart.com'
-    const demoPassword = 'petro1234' 
     const demoUserIndex = loaded.findIndex(
-      (user) => user.email.toLowerCase() === demoEmail,
+      (user) => user.email.toLowerCase() === DEMO_EMAIL,
     )
 
     if (demoUserIndex === -1) {
@@ -148,21 +184,56 @@ export default function App() {
           typeof crypto !== 'undefined' && 'randomUUID' in crypto
             ? crypto.randomUUID()
             : `seed-${Date.now()}`,
-        email: demoEmail,
-        password: demoPassword,
+        email: DEMO_EMAIL,
+        password: DEMO_PASSWORD,
         name: 'Cuenta demo',
         createdAt: safeNow(),
         lastLoginAt: safeNow(),
+        role: 'demo',
       }
       loaded = [...loaded, demoUser]
       writeUsers(loaded)
-    } else if (loaded[demoUserIndex].password !== demoPassword) {
+    } else if (loaded[demoUserIndex].password !== DEMO_PASSWORD) {
       loaded[demoUserIndex] = {
         ...loaded[demoUserIndex],
-        password: demoPassword,
+        password: DEMO_PASSWORD,
+        role: 'demo',
       }
+      loaded = loaded.map((user) => normalizeStoredUser(user))
       writeUsers(loaded)
     }
+
+    ADMIN_EMAILS.forEach((adminEmail) => {
+      const adminIndex = loaded.findIndex(
+        (user) => user.email.toLowerCase() === adminEmail,
+      )
+      if (adminIndex === -1) {
+        const adminUser: StoredUser = {
+          id:
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : `admin-${Date.now()}`,
+          email: adminEmail,
+          password: ADMIN_PASSWORD,
+          name: 'Administrador',
+          createdAt: safeNow(),
+          lastLoginAt: safeNow(),
+          role: 'admin',
+        }
+        loaded = [...loaded, adminUser]
+      } else {
+        const current = loaded[adminIndex]
+        loaded[adminIndex] = {
+          ...current,
+          password: ADMIN_PASSWORD,
+          role: 'admin',
+          name: current.name || 'Administrador',
+        }
+      }
+    })
+
+    loaded = loaded.map((user) => normalizeStoredUser(user))
+    writeUsers(loaded)
 
     setUsers(loaded)
 
@@ -256,16 +327,29 @@ export default function App() {
       return
     }
 
+    const assignedRole = ADMIN_EMAILS.has(normalizedEmail) ? 'admin' : 'user'
+    const assignedPassword =
+      assignedRole === 'admin' ? ADMIN_PASSWORD : normalizedPassword
+
+    if (assignedPassword.length < 6) {
+      setFeedback({
+        type: 'error',
+        message: 'Tu contraseña debe tener al menos 6 caracteres.',
+      })
+      return
+    }
+
     const newUser: StoredUser = {
       id:
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
           ? crypto.randomUUID()
           : `user-${Date.now()}`,
       email: normalizedEmail,
-      password: normalizedPassword,
+      password: assignedPassword,
       name: trimmedName,
       createdAt: safeNow(),
       lastLoginAt: safeNow(),
+      role: assignedRole,
     }
 
     const updatedUsers = [...allUsers, newUser]
@@ -488,6 +572,13 @@ type PetroArteCentralProps = {
 function PetroArteCentral({ user, users, onLogout }: PetroArteCentralProps) {
   const [selected, setSelected] = useState<AppItem | null>(null)
   const particles = useParticles(45)
+  const accessibleItems = APP_ITEMS.filter(
+    (item) => !item.requiredRole || item.requiredRole === user.role,
+  )
+  const activeSelection =
+    selected && accessibleItems.some((item) => item.id === selected.id)
+      ? selected
+      : null
 
   return (
     <div className="relative min-h-screen bg-[#0F0F0F] text-white flex flex-col items-center justify-center overflow-hidden">
@@ -554,15 +645,15 @@ function PetroArteCentral({ user, users, onLogout }: PetroArteCentralProps) {
         en este dispositivo.
       </p>
 
-      {selected ? (
+      {activeSelection ? (
         <motion.div
-          className="relative w-[95%] max-w-5xl h-[70vh] bg-black/70 rounded-2xl overflow-hidden backdrop-blur-md border border-[#A10F2D] shadow-[0_0_25px_rgba(220,20,60,0.3)] z-10"
+          className="relative w-[97%] max-w-6xl h-[82vh] bg-black/70 rounded-2xl overflow-hidden backdrop-blur-md border border-[#A10F2D] shadow-[0_0_25px_rgba(220,20,60,0.3)] z-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
           <iframe
-            src={selected.url}
-            title={selected.name}
+            src={activeSelection.url}
+            title={activeSelection.name}
             className="w-full h-full border-none"
           />
           <button
@@ -578,7 +669,7 @@ function PetroArteCentral({ user, users, onLogout }: PetroArteCentralProps) {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {APP_ITEMS.map((app) => (
+          {accessibleItems.map((app) => (
             <motion.div
               key={app.id}
               whileHover={{ scale: 1.06, rotate: 0.5 }}
