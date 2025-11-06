@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
-import { FaCalculator, FaDatabase, FaStore, FaUsersCog } from 'react-icons/fa'
+import { FaCalculator, FaDatabase, FaUsersCog } from 'react-icons/fa'
 
 type UserRole = 'admin' | 'user' | 'demo'
 
@@ -98,13 +98,6 @@ const APP_ITEMS: AppItem[] = [
     description: 'Administra préstamos, pagos y personal fácilmente.',
     icon: <FaUsersCog className="text-4xl text-[#DC143C]" />,
     url: 'https://nominas-petroarte.vercel.app',
-  },
-  {
-    id: 'tienda',
-    name: 'PetroShop',
-    description: 'Explora y vende productos de PetroArte.',
-    icon: <FaStore className="text-4xl text-[#DC143C]" />,
-    url: 'https://petroshop-six.vercel.app',
   },
   {
     id: 'mongo-admin',
