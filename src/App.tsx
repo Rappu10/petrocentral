@@ -640,7 +640,7 @@ function PetroArteCentral({ user, users, onLogout }: PetroArteCentralProps) {
 
       {activeSelection ? (
         <motion.div
-          className="relative w-[97%] max-w-6xl h-[82vh] bg-black/70 rounded-2xl overflow-hidden backdrop-blur-md border border-[#A10F2D] shadow-[0_0_25px_rgba(220,20,60,0.3)] z-10"
+          className="relative w-full max-w-[90rem] h-[90vh] md:h-[95vh] bg-black/70 rounded-2xl overflow-hidden backdrop-blur-md border border-[#A10F2D] shadow-[0_0_25px_rgba(220,20,60,0.3)] z-10"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >
